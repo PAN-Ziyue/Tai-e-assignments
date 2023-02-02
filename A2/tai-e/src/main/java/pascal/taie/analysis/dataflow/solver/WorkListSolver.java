@@ -26,6 +26,9 @@ import pascal.taie.analysis.dataflow.analysis.DataflowAnalysis;
 import pascal.taie.analysis.dataflow.fact.DataflowResult;
 import pascal.taie.analysis.graph.cfg.CFG;
 
+import java.util.HashSet;
+import java.util.Set;
+
 class WorkListSolver<Node, Fact> extends Solver<Node, Fact> {
 
     WorkListSolver(DataflowAnalysis<Node, Fact> analysis) {
@@ -35,6 +38,47 @@ class WorkListSolver<Node, Fact> extends Solver<Node, Fact> {
     @Override
     protected void doSolveForward(CFG<Node> cfg, DataflowResult<Node, Fact> result) {
         // TODO - finish me
+        HashSet<Node> worklist = new HashSet<>();
+        for (Node n: cfg) {
+            if (n != cfg.getEntry())
+                worklist.add(n);
+        }
+
+        while (!worklist.isEmpty()) {
+            Node b = worklist.iterator().next();
+            worklist.remove(b);
+
+            Fact tmp = analysis.newInitialFact();
+            for (Node s : cfg.getPredsOf(b)) {
+                Fact out = result.getOutFact(s);
+                analysis.meetInto(out, tmp);
+            }
+            result.setInFact(b, tmp);
+
+            if (analysis.transferNode(b, result.getInFact(b), result.getOutFact(b))) {
+                Set<Node> succ = cfg.getSuccsOf(b);
+                worklist.addAll(succ);
+            }
+        }
+
+//        boolean change;
+//
+//        do {
+//            change = false;
+//            for (Node b : cfg) {
+//                if (b == cfg.getEntry()) // exclude exit node
+//                    continue;
+//
+//                // meet successors' in fact
+//                Fact tmp = analysis.newInitialFact();
+//                for (Node s : cfg.getPredsOf(b))
+//                    analysis.meetInto(result.getOutFact(s), tmp);
+//                result.setInFact(b, tmp);
+//
+//                // transfer and check if change occurs
+//                change = change || analysis.transferNode(b, result.getInFact(b), result.getOutFact(b));
+//            }
+//        } while (change);
     }
 
     @Override
