@@ -33,21 +33,14 @@ import pascal.taie.analysis.graph.cfg.CFGBuilder;
 import pascal.taie.analysis.graph.cfg.Edge;
 import pascal.taie.config.AnalysisConfig;
 import pascal.taie.ir.IR;
-import pascal.taie.ir.exp.ArithmeticExp;
-import pascal.taie.ir.exp.ArrayAccess;
-import pascal.taie.ir.exp.CastExp;
-import pascal.taie.ir.exp.FieldAccess;
-import pascal.taie.ir.exp.NewExp;
-import pascal.taie.ir.exp.RValue;
-import pascal.taie.ir.exp.Var;
+import pascal.taie.ir.exp.*;
 import pascal.taie.ir.stmt.AssignStmt;
 import pascal.taie.ir.stmt.If;
 import pascal.taie.ir.stmt.Stmt;
 import pascal.taie.ir.stmt.SwitchStmt;
+import pascal.taie.util.collection.Pair;
 
-import java.util.Comparator;
-import java.util.Set;
-import java.util.TreeSet;
+import java.util.*;
 
 public class DeadCodeDetection extends MethodAnalysis {
 
@@ -71,6 +64,68 @@ public class DeadCodeDetection extends MethodAnalysis {
         Set<Stmt> deadCode = new TreeSet<>(Comparator.comparing(Stmt::getIndex));
         // TODO - finish me
         // Your task is to recognize dead code in ir and add it to deadCode
+
+        //============
+        // unreachable
+        //============
+        HashSet<Map.Entry<Stmt, Stmt>> prunedEdges = new HashSet<>();
+        for (Stmt stmt : ir.getStmts()) {
+            if (stmt instanceof If ifStmt) {
+                Value v = ConstantPropagation.evaluate(ifStmt.getCondition(), constants.getResult(stmt));
+                if (!v.isConstant()) continue;
+
+                if (v.getConstant() == 0) { // if-true is deadcode
+                    prunedEdges.add(Map.entry(stmt, ifStmt.getTarget()));
+                } else { // if-false is deadcode
+                    for (Edge<Stmt> edge : cfg.getOutEdgesOf(stmt))
+                        if (edge.getKind() == Edge.Kind.IF_FALSE)
+                            prunedEdges.add(Map.entry(stmt, edge.getTarget()));
+                }
+            } else if (stmt instanceof SwitchStmt switchStmt) {
+                Value v = ConstantPropagation.evaluate(switchStmt.getVar(), constants.getResult(stmt));
+                if (!v.isConstant()) continue;
+
+                boolean found = false;
+                for (Pair<Integer, Stmt> casePair : switchStmt.getCaseTargets()) {
+                    if (v.getConstant() == casePair.first()) found = true;
+                    else prunedEdges.add(Map.entry(stmt, casePair.second()));
+                }
+
+                if (found) prunedEdges.add(Map.entry(stmt, switchStmt.getDefaultTarget()));
+            }
+        }
+
+        // bfs pruning
+        HashSet<Stmt> visited = new HashSet<>();
+        LinkedList<Stmt> toVisit = new LinkedList<>();
+        toVisit.add(cfg.getEntry());
+
+        while (!toVisit.isEmpty()) {
+            Stmt node = toVisit.pop();
+            visited.add(node);
+
+            for (Stmt adjacent : cfg.getSuccsOf(node))
+                if (!visited.contains(adjacent) && !prunedEdges.contains(Map.entry(node, adjacent)))
+                    toVisit.add(adjacent);
+        }
+        deadCode.addAll(cfg.getNodes());
+        deadCode.remove(cfg.getExit());
+        deadCode.removeAll(visited);
+
+
+        //================
+        // dead assignment
+        //================
+        for (Stmt stmt : ir.getStmts()) {
+            if (deadCode.contains(stmt)) continue;
+
+            if (stmt instanceof AssignStmt<?, ?> assignStmt
+                    && assignStmt.getLValue() instanceof Var var
+                    && !liveVars.getResult(stmt).contains(var)
+                    && hasNoSideEffect(assignStmt.getRValue()))
+                deadCode.add(stmt);
+        }
+
         return deadCode;
     }
 
