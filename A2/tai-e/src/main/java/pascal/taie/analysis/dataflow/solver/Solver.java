@@ -77,7 +77,6 @@ public abstract class Solver<Node, Fact> {
     }
 
     protected void initializeForward(CFG<Node> cfg, DataflowResult<Node, Fact> result) {
-        // TODO - finish me
         // initialize boundary fact
         result.setOutFact(cfg.getEntry(), analysis.newBoundaryFact(cfg));
 
