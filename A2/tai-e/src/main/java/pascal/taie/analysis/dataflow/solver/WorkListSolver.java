@@ -38,10 +38,9 @@ class WorkListSolver<Node, Fact> extends Solver<Node, Fact> {
     protected void doSolveForward(CFG<Node> cfg, DataflowResult<Node, Fact> result) {
         // initialization
         HashSet<Node> worklist = new HashSet<>();
-        for (Node n: cfg) {
+        for (Node n : cfg)
             if (n != cfg.getEntry())    // exempt entry from the worklist
                 worklist.add(n);
-        }
 
         while (!worklist.isEmpty()) {
             // retrieve one element
@@ -50,16 +49,13 @@ class WorkListSolver<Node, Fact> extends Solver<Node, Fact> {
 
             // compute in facts
             Fact tmp = analysis.newInitialFact();
-            for (Node s : cfg.getPredsOf(b)) {
-                Fact out = result.getOutFact(s);
-                analysis.meetInto(out, tmp);
-            }
+            for (Node s : cfg.getPredsOf(b))
+                analysis.meetInto(result.getOutFact(s), tmp);
             result.setInFact(b, tmp);
 
             // manage successors
-            if (analysis.transferNode(b, result.getInFact(b), result.getOutFact(b))) {
+            if (analysis.transferNode(b, result.getInFact(b), result.getOutFact(b)))
                 worklist.addAll(cfg.getSuccsOf(b));
-            }
         }
     }
 
