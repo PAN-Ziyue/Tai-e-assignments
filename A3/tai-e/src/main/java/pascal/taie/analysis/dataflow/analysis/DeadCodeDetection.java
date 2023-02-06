@@ -62,15 +62,17 @@ public class DeadCodeDetection extends MethodAnalysis {
                 ir.getResult(LiveVariableAnalysis.ID);
         // keep statements (dead code) sorted in the resulting set
         Set<Stmt> deadCode = new TreeSet<>(Comparator.comparing(Stmt::getIndex));
-        // TODO - finish me
+
         // Your task is to recognize dead code in ir and add it to deadCode
 
         //============
         // unreachable
         //============
-        HashSet<Map.Entry<Stmt, Stmt>> prunedEdges = new HashSet<>();
+        HashSet<Map.Entry<Stmt, Stmt>> prunedEdges = new HashSet<>(); // track pruned edges
         for (Stmt stmt : ir.getStmts()) {
+            // handle if statement
             if (stmt instanceof If ifStmt) {
+                // calculate condition value
                 Value v = ConstantPropagation.evaluate(ifStmt.getCondition(), constants.getResult(stmt));
                 if (!v.isConstant()) continue;
 
@@ -81,17 +83,21 @@ public class DeadCodeDetection extends MethodAnalysis {
                         if (edge.getKind() == Edge.Kind.IF_FALSE)
                             prunedEdges.add(Map.entry(stmt, edge.getTarget()));
                 }
-            } else if (stmt instanceof SwitchStmt switchStmt) {
+            }
+
+            // handle switch statement
+            else if (stmt instanceof SwitchStmt switchStmt) {
+                // calculate switch value
                 Value v = ConstantPropagation.evaluate(switchStmt.getVar(), constants.getResult(stmt));
                 if (!v.isConstant()) continue;
 
-                boolean found = false;
+                boolean match = false; // indicate if case value is matched
                 for (Pair<Integer, Stmt> casePair : switchStmt.getCaseTargets()) {
-                    if (v.getConstant() == casePair.first()) found = true;
+                    if (v.getConstant() == casePair.first()) match = true; // matched case value, prune default edge
                     else prunedEdges.add(Map.entry(stmt, casePair.second()));
                 }
 
-                if (found) prunedEdges.add(Map.entry(stmt, switchStmt.getDefaultTarget()));
+                if (match) prunedEdges.add(Map.entry(stmt, switchStmt.getDefaultTarget()));
             }
         }
 
@@ -105,11 +111,12 @@ public class DeadCodeDetection extends MethodAnalysis {
             visited.add(node);
 
             for (Stmt adjacent : cfg.getSuccsOf(node))
+                // visit non-pruned adjacent nodes
                 if (!visited.contains(adjacent) && !prunedEdges.contains(Map.entry(node, adjacent)))
                     toVisit.add(adjacent);
         }
         deadCode.addAll(cfg.getNodes());
-        deadCode.remove(cfg.getExit());
+        deadCode.remove(cfg.getExit()); // should not include exit node
         deadCode.removeAll(visited);
 
 
@@ -119,10 +126,10 @@ public class DeadCodeDetection extends MethodAnalysis {
         for (Stmt stmt : ir.getStmts()) {
             if (deadCode.contains(stmt)) continue;
 
-            if (stmt instanceof AssignStmt<?, ?> assignStmt
-                    && assignStmt.getLValue() instanceof Var var
-                    && !liveVars.getResult(stmt).contains(var)
-                    && hasNoSideEffect(assignStmt.getRValue()))
+            if (stmt instanceof AssignStmt<?, ?> assignStmt         // assignment
+                    && assignStmt.getLValue() instanceof Var var    // left value is a var
+                    && !liveVars.getResult(stmt).contains(var)      // not a living variable
+                    && hasNoSideEffect(assignStmt.getRValue()))     // right value has no side effect
                 deadCode.add(stmt);
         }
 
