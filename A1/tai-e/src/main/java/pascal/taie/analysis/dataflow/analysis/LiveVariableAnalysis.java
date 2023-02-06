@@ -71,12 +71,12 @@ public class LiveVariableAnalysis extends
         in.set(out);
         if (stmt.getDef().isPresent()) {
             LValue lval = stmt.getDef().get();
-            if (lval instanceof Var)
-                in.remove((Var) lval); // exclude defs
+            if (lval instanceof Var v)
+                in.remove(v); // exclude defs
         }
         for (RValue rval: stmt.getUses()) {
-            if (rval instanceof Var)
-                in.add((Var) rval); // add uses
+            if (rval instanceof Var v)
+                in.add(v); // add uses
         }
 
         return !old.equals(in); // return true if change occurs
