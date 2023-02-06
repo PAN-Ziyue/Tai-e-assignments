@@ -60,7 +60,8 @@ public class ConstantPropagation extends
         CPFact fact = new CPFact();
 
         for (Var v : cfg.getIR().getParams())
-            fact.update(v, Value.getNAC());
+            if (canHoldInt(v))
+                fact.update(v, Value.getNAC());
 
 //        CPFact fact = new CPFact();
 //        for (Stmt s : cfg.getNodes()) {
@@ -160,7 +161,7 @@ public class ConstantPropagation extends
     public static Value evaluate(Exp exp, CPFact in) {
         // TODO - finish me
         Value v;
-        if (exp instanceof Var var) {
+        if (exp instanceof Var var && canHoldInt(var)) {
             v = in.get(var);
         } else if (exp instanceof IntLiteral literal) {
             v = Value.makeConstant(literal.getValue());
@@ -211,7 +212,14 @@ public class ConstantPropagation extends
                 }
 
                 v = div_zero ? Value.getUndef() : Value.makeConstant(res);
-            } else if (in.get(y).isNAC() || in.get(z).isNAC()) {
+            } else if (in.get(y).isNAC()) {
+                BinaryExp.Op op = bin.getOperator();
+                if ((op == ArithmeticExp.Op.DIV || op == ArithmeticExp.Op.REM) && in.get(z).isConstant() && in.get(z).getConstant() == 0) {
+                    v = Value.getUndef();
+                } else {
+                    v = Value.getNAC();
+                }
+            } else if (in.get(z).isNAC()) {
                 v = Value.getNAC();
             } else {
                 v = Value.getUndef();
