@@ -31,6 +31,7 @@ import pascal.taie.language.classes.JMethod;
 import pascal.taie.language.classes.Subsignature;
 
 import java.util.ArrayDeque;
+import java.util.HashSet;
 import java.util.Queue;
 import java.util.Set;
 
@@ -59,6 +60,17 @@ class CHABuilder implements CGBuilder<Invoke, JMethod> {
      */
     private Set<JMethod> resolve(Invoke callSite) {
         // TODO - finish me
+        Set<JMethod> targets = new HashSet<>();
+
+        if (callSite.isStatic()) {
+
+        } else if (callSite.isSpecial()) {
+
+        } else if (callSite.isVirtual()) {
+
+        }
+
+        callSite.getMethodRef().getSubsignature();
         return null;
     }
 
@@ -70,6 +82,15 @@ class CHABuilder implements CGBuilder<Invoke, JMethod> {
      */
     private JMethod dispatch(JClass jclass, Subsignature subsignature) {
         // TODO - finish me
-        return null;
+        for (JMethod m : jclass.getDeclaredMethods()) {
+            if (m.getSubsignature().equals(subsignature)) {
+                return m;
+            }
+        }
+
+        if (jclass.getSuperClass() != null)
+            return dispatch(jclass.getSuperClass(), subsignature);
+        else
+            return null;
     }
 }
