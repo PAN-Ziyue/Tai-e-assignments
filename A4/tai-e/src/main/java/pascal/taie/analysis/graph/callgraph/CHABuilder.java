@@ -52,6 +52,26 @@ class CHABuilder implements CGBuilder<Invoke, JMethod> {
         DefaultCallGraph callGraph = new DefaultCallGraph();
         callGraph.addEntryMethod(entry);
         // TODO - finish me
+
+        HashSet<JMethod> workList = new HashSet<>();
+        workList.add(entry);
+
+        while (!workList.isEmpty()) {
+            JMethod method = workList.iterator().next();
+            workList.remove(method);
+
+            if (!callGraph.contains(method)) {
+                callGraph.addReachableMethod(method);
+
+                callGraph.callSitesIn(method).forEach(callSite -> {
+                    for (JMethod targetMethod : resolve(callSite)) {
+                        callGraph.addEdge(new Edge<>(CallGraphs.getCallKind(callSite), callSite, targetMethod));
+                        workList.add(targetMethod);
+                    }
+                });
+            }
+        }
+
         return callGraph;
     }
 
@@ -61,17 +81,24 @@ class CHABuilder implements CGBuilder<Invoke, JMethod> {
     private Set<JMethod> resolve(Invoke callSite) {
         // TODO - finish me
         Set<JMethod> targets = new HashSet<>();
+        JClass declaringClass = callSite.getMethodRef().getDeclaringClass();
+        Subsignature subsignature = callSite.getMethodRef().getSubsignature();
 
         if (callSite.isStatic()) {
-
+            targets.add(declaringClass.getDeclaredMethod(subsignature));
         } else if (callSite.isSpecial()) {
-
+            targets.add(dispatch(declaringClass, subsignature));
         } else if (callSite.isVirtual()) {
-
+            targets.add(dispatch(declaringClass, subsignature));
+            for (JClass c : hierarchy.getDirectSubclassesOf(declaringClass))
+                targets.add(dispatch(c, subsignature));
+            for (JClass c : hierarchy.getDirectSubinterfacesOf(declaringClass))
+                targets.add(dispatch(c, subsignature));
+            for (JClass c : hierarchy.getDirectImplementorsOf(declaringClass))
+                targets.add(dispatch(c, subsignature));
         }
 
-        callSite.getMethodRef().getSubsignature();
-        return null;
+        return targets;
     }
 
     /**
