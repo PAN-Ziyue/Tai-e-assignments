@@ -87,15 +87,28 @@ class CHABuilder implements CGBuilder<Invoke, JMethod> {
         if (callSite.isStatic()) {
             targets.add(declaringClass.getDeclaredMethod(subsignature));
         } else if (callSite.isSpecial()) {
-            targets.add(dispatch(declaringClass, subsignature));
+            JMethod dispatchMethod = dispatch(declaringClass, subsignature);
+            if (dispatchMethod != null)
+                targets.add(dispatchMethod);
         } else if (callSite.isVirtual()) {
-            targets.add(dispatch(declaringClass, subsignature));
-            for (JClass c : hierarchy.getDirectSubclassesOf(declaringClass))
-                targets.add(dispatch(c, subsignature));
-            for (JClass c : hierarchy.getDirectSubinterfacesOf(declaringClass))
-                targets.add(dispatch(c, subsignature));
-            for (JClass c : hierarchy.getDirectImplementorsOf(declaringClass))
-                targets.add(dispatch(c, subsignature));
+            JMethod dispatchMethod = dispatch(declaringClass, subsignature);
+            if (dispatchMethod != null)
+                targets.add(dispatchMethod);
+            for (JClass c : hierarchy.getDirectSubclassesOf(declaringClass)) {
+                dispatchMethod = dispatch(c, subsignature);
+                if (dispatchMethod != null)
+                    targets.add(dispatchMethod);
+            }
+            for (JClass c : hierarchy.getDirectSubinterfacesOf(declaringClass)) {
+                dispatchMethod = dispatch(c, subsignature);
+                if (dispatchMethod != null)
+                    targets.add(dispatchMethod);
+            }
+            for (JClass c : hierarchy.getDirectImplementorsOf(declaringClass)) {
+                dispatchMethod = dispatch(c, subsignature);
+                if (dispatchMethod != null)
+                    targets.add(dispatchMethod);
+            }
         }
 
         return targets;
@@ -110,7 +123,7 @@ class CHABuilder implements CGBuilder<Invoke, JMethod> {
     private JMethod dispatch(JClass jclass, Subsignature subsignature) {
         // TODO - finish me
         for (JMethod m : jclass.getDeclaredMethods()) {
-            if (m.getSubsignature().equals(subsignature)) {
+            if (m.getSubsignature().equals(subsignature) && !m.isAbstract()) {
                 return m;
             }
         }
