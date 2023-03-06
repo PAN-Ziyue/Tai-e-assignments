@@ -84,30 +84,34 @@ class CHABuilder implements CGBuilder<Invoke, JMethod> {
         JClass declaringClass = callSite.getMethodRef().getDeclaringClass();
         Subsignature subsignature = callSite.getMethodRef().getSubsignature();
 
-        if (callSite.isStatic()) {
-            targets.add(declaringClass.getDeclaredMethod(subsignature));
-        } else if (callSite.isSpecial()) {
-            JMethod dispatchMethod = dispatch(declaringClass, subsignature);
-            if (dispatchMethod != null)
-                targets.add(dispatchMethod);
-        } else if (callSite.isVirtual()) {
-            JMethod dispatchMethod = dispatch(declaringClass, subsignature);
-            if (dispatchMethod != null)
-                targets.add(dispatchMethod);
-            for (JClass c : hierarchy.getDirectSubclassesOf(declaringClass)) {
-                dispatchMethod = dispatch(c, subsignature);
+        switch (CallGraphs.getCallKind(callSite)) {
+            case STATIC -> {
+                targets.add(declaringClass.getDeclaredMethod(subsignature));
+            }
+            case SPECIAL -> {
+                JMethod dispatchMethod = dispatch(declaringClass, subsignature);
                 if (dispatchMethod != null)
                     targets.add(dispatchMethod);
             }
-            for (JClass c : hierarchy.getDirectSubinterfacesOf(declaringClass)) {
-                dispatchMethod = dispatch(c, subsignature);
+            case VIRTUAL, INTERFACE -> {
+                JMethod dispatchMethod = dispatch(declaringClass, subsignature);
                 if (dispatchMethod != null)
                     targets.add(dispatchMethod);
-            }
-            for (JClass c : hierarchy.getDirectImplementorsOf(declaringClass)) {
-                dispatchMethod = dispatch(c, subsignature);
-                if (dispatchMethod != null)
-                    targets.add(dispatchMethod);
+                for (JClass c : hierarchy.getDirectSubclassesOf(declaringClass)) {
+                    dispatchMethod = dispatch(c, subsignature);
+                    if (dispatchMethod != null)
+                        targets.add(dispatchMethod);
+                }
+                for (JClass c : hierarchy.getDirectSubinterfacesOf(declaringClass)) {
+                    dispatchMethod = dispatch(c, subsignature);
+                    if (dispatchMethod != null)
+                        targets.add(dispatchMethod);
+                }
+                for (JClass c : hierarchy.getDirectImplementorsOf(declaringClass)) {
+                    dispatchMethod = dispatch(c, subsignature);
+                    if (dispatchMethod != null)
+                        targets.add(dispatchMethod);
+                }
             }
         }
 
