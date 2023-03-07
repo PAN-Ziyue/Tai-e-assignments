@@ -59,10 +59,43 @@ class InterSolver<Method, Node, Fact> {
     }
 
     private void initialize() {
-        // TODO - finish me
+        SetQueue<Node> entries = new SetQueue<>();
+        icfg.entryMethods().forEach(method -> entries.add(icfg.getEntryOf(method)));
+
+        for (Node node : icfg) {
+            if (entries.contains(node))
+                result.setOutFact(node, analysis.newBoundaryFact(node));
+            else
+                result.setOutFact(node, analysis.newInitialFact());
+        }
     }
 
     private void doSolve() {
-        // TODO - finish me
+        // initialization
+        workList = new SetQueue<>();
+        workList.addAll(icfg.getNodes());
+        icfg.entryMethods().forEach(method -> workList.remove(icfg.getEntryOf(method)));
+
+        while (!workList.isEmpty()) {
+            // retrieve one element
+            Node b = workList.iterator().next();
+            workList.remove(b);
+
+            // compute in facts
+            Fact tmp = analysis.newInitialFact();
+            for (Node pred : icfg.getPredsOf(b)) {
+                icfg.getInEdgesOf(b).forEach(edge -> {
+                    if (edge.getSource() == pred) {
+                        Fact edgeFact = analysis.transferEdge(edge, result.getOutFact(pred));
+                        analysis.meetInto(edgeFact, tmp);
+                    }
+                });
+            }
+            result.setInFact(b, tmp);
+
+            // manage successors
+            if (analysis.transferNode(b, result.getInFact(b), result.getOutFact(b)))
+                workList.addAll(icfg.getSuccsOf(b));
+        }
     }
 }

@@ -29,6 +29,7 @@ import pascal.taie.language.classes.ClassHierarchy;
 import pascal.taie.language.classes.JClass;
 import pascal.taie.language.classes.JMethod;
 import pascal.taie.language.classes.Subsignature;
+import pascal.taie.util.collection.SetQueue;
 
 import java.util.ArrayDeque;
 import java.util.HashSet;
@@ -79,11 +80,11 @@ class CHABuilder implements CGBuilder<Invoke, JMethod> {
      * Resolves call targets (callees) of a call site via CHA.
      */
     private Set<JMethod> resolve(Invoke callSite) {
-        // TODO - finish me
         Set<JMethod> targets = new HashSet<>();
         JClass declaringClass = callSite.getMethodRef().getDeclaringClass();
         Subsignature subsignature = callSite.getMethodRef().getSubsignature();
 
+        // handle callsites
         switch (CallGraphs.getCallKind(callSite)) {
             case STATIC -> {
                 targets.add(declaringClass.getDeclaredMethod(subsignature));
@@ -94,23 +95,20 @@ class CHABuilder implements CGBuilder<Invoke, JMethod> {
                     targets.add(dispatchMethod);
             }
             case VIRTUAL, INTERFACE -> {
-                JMethod dispatchMethod = dispatch(declaringClass, subsignature);
-                if (dispatchMethod != null)
-                    targets.add(dispatchMethod);
-                for (JClass c : hierarchy.getDirectSubclassesOf(declaringClass)) {
-                    dispatchMethod = dispatch(c, subsignature);
+                Queue<JClass> classQueue = new SetQueue<>();
+                classQueue.add(declaringClass);
+
+                // process subclasses recursively to
+                // collect all direct and indirect subclasses
+                while (!classQueue.isEmpty()) {
+                    JClass c = classQueue.poll();
+                    JMethod dispatchMethod = dispatch(c, subsignature);
                     if (dispatchMethod != null)
                         targets.add(dispatchMethod);
-                }
-                for (JClass c : hierarchy.getDirectSubinterfacesOf(declaringClass)) {
-                    dispatchMethod = dispatch(c, subsignature);
-                    if (dispatchMethod != null)
-                        targets.add(dispatchMethod);
-                }
-                for (JClass c : hierarchy.getDirectImplementorsOf(declaringClass)) {
-                    dispatchMethod = dispatch(c, subsignature);
-                    if (dispatchMethod != null)
-                        targets.add(dispatchMethod);
+
+                    classQueue.addAll(hierarchy.getDirectSubclassesOf(c));
+                    classQueue.addAll(hierarchy.getDirectSubinterfacesOf(c));
+                    classQueue.addAll(hierarchy.getDirectImplementorsOf(c));
                 }
             }
         }
@@ -125,11 +123,9 @@ class CHABuilder implements CGBuilder<Invoke, JMethod> {
      * can be found.
      */
     private JMethod dispatch(JClass jclass, Subsignature subsignature) {
-        // TODO - finish me
         for (JMethod m : jclass.getDeclaredMethods()) {
-            if (m.getSubsignature().equals(subsignature) && !m.isAbstract()) {
+            if (m.getSubsignature().equals(subsignature) && !m.isAbstract())
                 return m;
-            }
         }
 
         if (jclass.getSuperClass() != null)
