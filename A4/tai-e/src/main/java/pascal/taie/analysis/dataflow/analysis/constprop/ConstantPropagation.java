@@ -56,33 +56,64 @@ public class ConstantPropagation extends
 
     @Override
     public CPFact newBoundaryFact(CFG<Stmt> cfg) {
-        // TODO - finish me
-        return null;
+        CPFact fact = new CPFact();
+
+        // initialize integer parameters to NAC
+        for (Var v : cfg.getIR().getParams())
+            if (canHoldInt(v))
+                fact.update(v, Value.getNAC());
+
+        return fact;
     }
 
     @Override
     public CPFact newInitialFact() {
-        // TODO - finish me
-        return null;
+        return new CPFact();
     }
 
     @Override
     public void meetInto(CPFact fact, CPFact target) {
-        // TODO - finish me
+        for (Var k : fact.keySet())
+            target.update(k, meetValue(target.get(k), fact.get(k)));
     }
 
     /**
      * Meets two Values.
      */
     public Value meetValue(Value v1, Value v2) {
-        // TODO - finish me
-        return null;
+        Value v;
+        if (v1.isNAC() || v2.isNAC())
+            v = Value.getNAC();
+        else if (v1.isUndef())
+            v = v2;
+        else if (v2.isUndef())
+            v = v1;
+        else if (v1.getConstant() == v2.getConstant())
+            v = Value.makeConstant(v1.getConstant());
+        else
+            v = Value.getNAC();
+        return v;
     }
 
     @Override
     public boolean transferNode(Stmt stmt, CPFact in, CPFact out) {
-        // TODO - finish me
-        return false;
+        CPFact old = out.copy();
+        out.clear();
+        out.copyFrom(in);
+
+        if (stmt instanceof DefinitionStmt<?, ?> def) {
+            if (def.getLValue() instanceof Var var && canHoldInt(var)) {
+                out.remove(var);    // kill
+
+                if (def.getRValue() != null) {
+                    Value eval = evaluate(def.getRValue(), in); // gen
+                    if (eval != null)
+                        out.update(var, eval);
+                }
+            }
+        }
+
+        return !old.equals(out);
     }
 
     /**
@@ -111,7 +142,71 @@ public class ConstantPropagation extends
      * @return the resulting {@link Value}
      */
     public static Value evaluate(Exp exp, CPFact in) {
-        // TODO - finish me
-        return null;
+        Value v;
+        if (exp instanceof Var var && canHoldInt(var)) {
+            v = in.get(var);
+        } else if (exp instanceof IntLiteral literal) {
+            v = Value.makeConstant(literal.getValue());
+        } else if (exp instanceof BinaryExp bin) {
+            Value yVal = in.get(bin.getOperand1()), zVal = in.get(bin.getOperand2());
+            if (yVal.isConstant() && zVal.isConstant()) {
+                int res = 0, y = yVal.getConstant(), z = zVal.getConstant();
+                boolean divZero = false;
+
+                if (bin.getOperator() instanceof ArithmeticExp.Op op) {
+                    switch (op) {
+                        case ADD -> res = y + z;
+                        case SUB -> res = y - z;
+                        case MUL -> res = y * z;
+                        case DIV -> {
+                            if (z == 0) divZero = true;
+                            else res = y / z;
+                        }
+                        case REM -> {
+                            if (z == 0) divZero = true;
+                            else res = y % z;
+                        }
+                    }
+                } else if (bin.getOperator() instanceof BitwiseExp.Op op) {
+                    switch (op) {
+                        case OR -> res = y | z;
+                        case AND -> res = y & z;
+                        case XOR -> res = y ^ z;
+                    }
+                } else if (bin.getOperator() instanceof ConditionExp.Op op) {
+                    boolean cond = false;
+                    switch (op) {
+                        case EQ -> cond = y == z;
+                        case NE -> cond = y != z;
+                        case LT -> cond = y < z;
+                        case GT -> cond = y > z;
+                        case LE -> cond = y <= z;
+                        case GE -> cond = y >= z;
+                    }
+                    res = cond ? 1 : 0;
+                } else if (bin.getOperator() instanceof ShiftExp.Op op) {
+                    switch (op) {
+                        case SHL -> res = y << z;
+                        case SHR -> res = y >> z;
+                        case USHR -> res = y >>> z;
+                    }
+                }
+
+                v = divZero ? Value.getUndef() : Value.makeConstant(res);
+            } else if (yVal.isNAC()) {
+                BinaryExp.Op op = bin.getOperator();
+                if ((op == ArithmeticExp.Op.DIV || op == ArithmeticExp.Op.REM) && zVal.isConstant() && zVal.getConstant() == 0)
+                    v = Value.getUndef();   // if div by zero, result will be Undef even if y is NAC
+                else
+                    v = Value.getNAC();
+            } else if (zVal.isNAC()) {
+                v = Value.getNAC();
+            } else {
+                v = Value.getUndef();
+            }
+        } else {
+            v = Value.getNAC();
+        }
+        return v;
     }
 }
