@@ -108,10 +108,10 @@ class Solver {
     private class StmtProcessor implements StmtVisitor<Void> {
         @Override
         public Void visit(New newStmt) {
-            PointsToSet pts = new PointsToSet(heapModel.getObj( newStmt));
-            VarPtr x = pointerFlowGraph.getVarPtr( newStmt.getLValue());
+            PointsToSet pts = new PointsToSet(heapModel.getObj(newStmt));
+            VarPtr x = pointerFlowGraph.getVarPtr(newStmt.getLValue());
             workList.addEntry(x, pts);
-            return StmtVisitor.super.visit( newStmt);
+            return StmtVisitor.super.visit(newStmt);
         }
 
         @Override
@@ -246,7 +246,7 @@ class Solver {
     /**
      * Processes instance calls when points-to set of the receiver variable changes.
      *
-     * @param var  the variable that holds receiver objects
+     * @param var the variable that holds receiver objects
      * @param recv a new discovered object pointed by the variable.
      */
     private void processCall(Var var, Obj recv) {
