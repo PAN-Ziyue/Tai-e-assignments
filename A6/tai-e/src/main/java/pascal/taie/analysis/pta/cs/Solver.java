@@ -137,8 +137,10 @@ class Solver {
         //  via visitor pattern, then finish me
         @Override
         public Void visit(New stmt) {
-            PointsToSet pts = PointsToSetFactory.make(csManager.getCSObj(context, heapModel.getObj(stmt)));
             CSVar x = csManager.getCSVar(context, stmt.getLValue());
+            Obj obj = heapModel.getObj(stmt);
+            Context ctx = contextSelector.selectHeapContext(csMethod, obj);
+            PointsToSet pts = PointsToSetFactory.make(csManager.getCSObj(ctx, obj));
             workList.addEntry(x, pts);
             return StmtVisitor.super.visit(stmt);
         }
@@ -177,21 +179,22 @@ class Solver {
                 JMethod m = resolveCallee(null, invoke);
                 CSCallSite csCallSite = csManager.getCSCallSite(context, invoke);
                 Context ctx = contextSelector.selectContext(csCallSite, m);
+                CSMethod csm = csManager.getCSMethod(ctx, m);
 
-                if (!callGraph.getCalleesOf(csCallSite).contains(csMethod)) {
-                    callGraph.addEdge(new Edge<>(CallGraphs.getCallKind(invoke), csCallSite, csMethod));
-                    addReachable(csMethod);
+                if (!callGraph.getCalleesOf(csCallSite).contains(csm)) {
+                    callGraph.addEdge(new Edge<>(CallGraphs.getCallKind(invoke), csCallSite, csm));
+                    addReachable(csm);
 
                     for (int i = 0; i < m.getParamCount(); i++) {
                         CSVar a = csManager.getCSVar(csCallSite.getContext(), invoke.getInvokeExp().getArg(i));
-                        CSVar p = csManager.getCSVar(ctx, invoke.getInvokeExp().getArg(i));
+                        CSVar p = csManager.getCSVar(ctx, m.getIR().getParam(i));
                         addPFGEdge(a, p);
                     }
 
                     if (invoke.getLValue() != null)
                         m.getIR().getReturnVars().forEach(ret ->
                                 addPFGEdge(csManager.getCSVar(ctx, ret),
-                                        csManager.getCSVar(context, invoke.getLValue())));
+                                        csManager.getCSVar(csCallSite.getContext(), invoke.getLValue())));
                 }
             }
             return StmtVisitor.super.visit(invoke);
@@ -222,29 +225,30 @@ class Solver {
 
             if (item.pointer() instanceof CSVar csVar) {
                 Var var = csVar.getVar();
+                Context ctx = csVar.getContext();
                 delta.forEach(obj -> {
                     // field store
                     var.getStoreFields().forEach(s -> addPFGEdge(
-                            csManager.getCSVar(csVar.getContext(), s.getRValue()),
+                            csManager.getCSVar(ctx, s.getRValue()),
                             csManager.getInstanceField(obj, s.getFieldRef().resolve())
                     ));
 
                     // field load
                     var.getLoadFields().forEach(s -> addPFGEdge(
                             csManager.getInstanceField(obj, s.getFieldRef().resolve()),
-                            csManager.getCSVar(csVar.getContext(), s.getLValue())
+                            csManager.getCSVar(ctx, s.getLValue())
                     ));
 
                     // array store
                     var.getStoreArrays().forEach(s -> addPFGEdge(
-                            csManager.getCSVar(csVar.getContext(), s.getRValue()),
+                            csManager.getCSVar(ctx, s.getRValue()),
                             csManager.getArrayIndex(obj)
                     ));
 
                     // array load
                     var.getLoadArrays().forEach(s -> addPFGEdge(
                             csManager.getArrayIndex(obj),
-                            csManager.getCSVar(csVar.getContext(), s.getLValue())
+                            csManager.getCSVar(ctx, s.getLValue())
                     ));
 
                     processCall(csVar, obj);
@@ -291,7 +295,10 @@ class Solver {
             Context ctx =  contextSelector.selectContext(csCallSite, recvObj, m);
             CSMethod csMethod = csManager.getCSMethod(ctx, m);
 
-            workList.addEntry(recv, recv.getPointsToSet());
+            workList.addEntry(
+                    csManager.getCSVar(ctx, m.getIR().getThis()),
+                    PointsToSetFactory.make(recvObj)
+            );
 
             // calculate points-to relationship
             if (!callGraph.getCalleesOf(csCallSite).contains(csMethod)) {
@@ -309,7 +316,7 @@ class Solver {
                 if (invoke.getLValue() != null)
                     m.getIR().getReturnVars().forEach(ret ->
                             addPFGEdge(csManager.getCSVar(ctx, ret),
-                                    csManager.getCSVar(recv.getContext(), invoke.getLValue())));
+                                    csManager.getCSVar(csCallSite.getContext(), invoke.getLValue())));
             }
         });
     }
