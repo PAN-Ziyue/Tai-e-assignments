@@ -111,7 +111,6 @@ class Solver {
      * Processes new reachable context-sensitive method.
      */
     private void addReachable(CSMethod csMethod) {
-        // TODO - finish me
         if (callGraph.contains(csMethod))
             return;
         callGraph.addReachableMethod(csMethod);
@@ -133,8 +132,6 @@ class Solver {
             this.context = csMethod.getContext();
         }
 
-        // TODO - if you choose to implement addReachable()
-        //  via visitor pattern, then finish me
         @Override
         public Void visit(New stmt) {
             CSVar x = csManager.getCSVar(context, stmt.getLValue());
@@ -205,7 +202,6 @@ class Solver {
      * Adds an edge "source -> target" to the PFG.
      */
     private void addPFGEdge(Pointer source, Pointer target) {
-        // TODO - finish me
         if (pointerFlowGraph.getSuccsOf(source).contains(target))
             return;
 
@@ -218,7 +214,6 @@ class Solver {
      * Processes work-list entries until the work-list is empty.
      */
     private void analyze() {
-        // TODO - finish me
         while (!workList.isEmpty()) {
             WorkList.Entry item = workList.pollEntry();
             PointsToSet delta = propagate(item.pointer(), item.pointsToSet());
@@ -262,11 +257,10 @@ class Solver {
      * returns the difference set of pointsToSet and pt(pointer).
      */
     private PointsToSet propagate(Pointer pointer, PointsToSet pointsToSet) {
-        // TODO - finish me
         PointsToSet n = pointer.getPointsToSet();
         PointsToSet delta = PointsToSetFactory.make();
 
-        // calculate delat
+        // calculate delta
         pointsToSet.forEach(obj -> {
             if (!n.contains(obj))
                 delta.addObject(obj);
@@ -288,7 +282,6 @@ class Solver {
      * @param recvObj set of new discovered objects pointed by the variable.
      */
     private void processCall(CSVar recv, CSObj recvObj) {
-        // TODO - finish me
         recv.getVar().getInvokes().forEach(invoke -> {
             JMethod m = resolveCallee(recvObj, invoke);
             CSCallSite csCallSite = csManager.getCSCallSite(recv.getContext(), invoke);
