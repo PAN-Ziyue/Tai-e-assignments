@@ -228,7 +228,7 @@ class Solver {
         PointsToSet n = pointer.getPointsToSet();
         PointsToSet delta = new PointsToSet();
 
-        // calculate delat
+        // calculate delta
         pointsToSet.forEach(obj -> {
             if (!n.contains(obj))
                 delta.addObject(obj);
