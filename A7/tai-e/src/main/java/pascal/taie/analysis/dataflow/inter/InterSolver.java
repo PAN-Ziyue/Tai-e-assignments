@@ -43,7 +43,7 @@ class InterSolver<Method, Node, Fact> {
 
     private DataflowResult<Node, Fact> result;
 
-    private Queue<Node> workList;
+    public Queue<Node> workList;    // change worklist to public
 
     InterSolver(InterDataflowAnalysis<Node, Fact> analysis,
                 ICFG<Method, Node> icfg) {
@@ -59,7 +59,6 @@ class InterSolver<Method, Node, Fact> {
     }
 
     private void initialize() {
-        // TODO - finish me
         SetQueue<Node> entries = new SetQueue<>();
         icfg.entryMethods().forEach(method -> entries.add(icfg.getEntryOf(method)));
 
@@ -72,7 +71,6 @@ class InterSolver<Method, Node, Fact> {
     }
 
     private void doSolve() {
-        // TODO - finish me
         // initialization
         workList = new SetQueue<>();
         workList.addAll(icfg.getNodes());
