@@ -213,6 +213,16 @@ public class Solver {
                                 addPFGEdge(csManager.getCSVar(ctx, ret),
                                         csManager.getCSVar(csCallSite.getContext(), invoke.getLValue())));
                 }
+
+                // handle taint source
+                Obj taintObj = taintAnalysis.processSources(invoke);
+                Var taintVar = invoke.getLValue();
+                if (taintObj != null && taintVar != null) {
+                    workList.addEntry(
+                            csManager.getCSVar(csCallSite.getContext(), taintVar),
+                            PointsToSetFactory.make(csManager.getCSObj(contextSelector.getEmptyContext(), taintObj))
+                    );
+                }
             }
 
             return StmtVisitor.super.visit(invoke);
@@ -310,7 +320,7 @@ public class Solver {
         recv.getVar().getInvokes().forEach(invoke -> {
             JMethod m = resolveCallee(recvObj, invoke);
             CSCallSite csCallSite = csManager.getCSCallSite(recv.getContext(), invoke);
-            Context ctx =  contextSelector.selectContext(csCallSite, recvObj, m);
+            Context ctx = contextSelector.selectContext(csCallSite, recvObj, m);
             CSMethod csMethod = csManager.getCSMethod(ctx, m);
 
             workList.addEntry(
@@ -335,6 +345,16 @@ public class Solver {
                     m.getIR().getReturnVars().forEach(ret ->
                             addPFGEdge(csManager.getCSVar(ctx, ret),
                                     csManager.getCSVar(csCallSite.getContext(), invoke.getLValue())));
+            }
+
+            // handle taint source
+            Obj taintObj = taintAnalysis.processSources(invoke);
+            Var taintVar = invoke.getLValue();
+            if (taintObj != null && taintVar != null) {
+                workList.addEntry(
+                        csManager.getCSVar(csCallSite.getContext(), taintVar),
+                        PointsToSetFactory.make(csManager.getCSObj(contextSelector.getEmptyContext(), taintObj))
+                );
             }
         });
     }
