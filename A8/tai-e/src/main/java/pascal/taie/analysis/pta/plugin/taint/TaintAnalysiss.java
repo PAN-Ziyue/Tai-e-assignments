@@ -25,26 +25,20 @@ package pascal.taie.analysis.pta.plugin.taint;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import pascal.taie.World;
-import pascal.taie.analysis.graph.callgraph.CallGraph;
 import pascal.taie.analysis.pta.PointerAnalysisResult;
-import pascal.taie.analysis.pta.core.cs.CSCallGraph;
 import pascal.taie.analysis.pta.core.cs.context.Context;
 import pascal.taie.analysis.pta.core.cs.element.CSCallSite;
 import pascal.taie.analysis.pta.core.cs.element.CSManager;
-import pascal.taie.analysis.pta.core.cs.element.CSMethod;
 import pascal.taie.analysis.pta.core.cs.element.CSVar;
 import pascal.taie.analysis.pta.core.heap.Obj;
 import pascal.taie.analysis.pta.cs.Solver;
 import pascal.taie.analysis.pta.pts.PointsToSetFactory;
-import pascal.taie.ir.exp.InvokeInstanceExp;
 import pascal.taie.ir.exp.Var;
-import pascal.taie.ir.proginfo.MethodRef;
 import pascal.taie.ir.stmt.Invoke;
 import pascal.taie.language.classes.JMethod;
 import pascal.taie.util.collection.Maps;
 import pascal.taie.util.collection.MultiMap;
 
-import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 
