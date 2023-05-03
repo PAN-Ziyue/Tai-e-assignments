@@ -39,6 +39,7 @@ import pascal.taie.language.classes.JMethod;
 import pascal.taie.util.collection.Maps;
 import pascal.taie.util.collection.MultiMap;
 
+import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 
