@@ -49,7 +49,9 @@ import pascal.taie.analysis.pta.plugin.taint.TaintAnalysiss;
 import pascal.taie.analysis.pta.pts.PointsToSet;
 import pascal.taie.analysis.pta.pts.PointsToSetFactory;
 import pascal.taie.config.AnalysisOptions;
+import pascal.taie.ir.exp.InvokeDynamic;
 import pascal.taie.ir.exp.InvokeExp;
+import pascal.taie.ir.exp.InvokeInstanceExp;
 import pascal.taie.ir.exp.Var;
 import pascal.taie.ir.stmt.Copy;
 import pascal.taie.ir.stmt.Invoke;
@@ -124,11 +126,16 @@ public class Solver {
         addReachable(csMethod);
     }
 
+
+    // export worklist interface to taint analysis plugin
+    public void addWorkList(Pointer pointer, PointsToSet pointsToSet) {
+        workList.addEntry(pointer, pointsToSet);
+    }
+
     /**
      * Processes new reachable context-sensitive method.
      */
     private void addReachable(CSMethod csMethod) {
-        // TODO - finish me
         if (callGraph.contains(csMethod))
             return;
         callGraph.addReachableMethod(csMethod);
@@ -150,8 +157,6 @@ public class Solver {
             this.context = csMethod.getContext();
         }
 
-        // TODO - if you choose to implement addReachable()
-        //  via visitor pattern, then finish me
         @Override
         public Void visit(New stmt) {
             CSVar x = csManager.getCSVar(context, stmt.getLValue());
@@ -215,15 +220,13 @@ public class Solver {
                 }
 
                 // handle taint source
-                Obj taintObj = taintAnalysis.processSources(invoke);
-                Var taintVar = invoke.getLValue();
-                if (taintObj != null && taintVar != null) {
-                    workList.addEntry(
-                            csManager.getCSVar(csCallSite.getContext(), taintVar),
-                            PointsToSetFactory.make(csManager.getCSObj(contextSelector.getEmptyContext(), taintObj))
-                    );
-                }
+                taintAnalysis.processSources(invoke, csCallSite.getContext());
+                taintAnalysis.transferTaint(m, null, csCallSite);
             }
+
+            // put each arg -> invoke into taint flow graph
+            invoke.getInvokeExp().getArgs().forEach(arg ->
+                    taintAnalysis.taintFlowGraph.put(csManager.getCSVar(context, arg), invoke));
 
             return StmtVisitor.super.visit(invoke);
         }
@@ -233,7 +236,6 @@ public class Solver {
      * Adds an edge "source -> target" to the PFG.
      */
     private void addPFGEdge(Pointer source, Pointer target) {
-        // TODO - finish me
         if (pointerFlowGraph.getSuccsOf(source).contains(target))
             return;
 
@@ -246,7 +248,6 @@ public class Solver {
      * Processes work-list entries until the work-list is empty.
      */
     private void analyze() {
-        // TODO - finish me
         while (!workList.isEmpty()) {
             WorkList.Entry item = workList.pollEntry();
             PointsToSet delta = propagate(item.pointer(), item.pointsToSet());
@@ -280,6 +281,21 @@ public class Solver {
                     ));
 
                     processCall(csVar, obj);
+
+                    // taint flow
+                    taintAnalysis.taintFlowGraph.get(csVar).forEach(invoke -> {
+                        CSCallSite csCallSite = csManager.getCSCallSite(ctx, invoke);
+                        if (invoke.getInvokeExp() instanceof InvokeInstanceExp exp) {
+                            CSVar recv = csManager.getCSVar(ctx, exp.getBase());
+                            result.getPointsToSet(recv).forEach(recvObj -> {
+                                JMethod callee = resolveCallee(recvObj, invoke);
+                                taintAnalysis.transferTaint(callee, recv, csCallSite);
+                            });
+                        } else {
+                            JMethod callee = resolveCallee(null, invoke);
+                            taintAnalysis.transferTaint(callee, null, csCallSite);
+                        }
+                    });
                 });
             }
         }
@@ -290,7 +306,6 @@ public class Solver {
      * returns the difference set of pointsToSet and pt(pointer).
      */
     private PointsToSet propagate(Pointer pointer, PointsToSet pointsToSet) {
-        // TODO - finish me
         PointsToSet n = pointer.getPointsToSet();
         PointsToSet delta = PointsToSetFactory.make();
 
@@ -316,7 +331,6 @@ public class Solver {
      * @param recvObj set of new discovered objects pointed by the variable.
      */
     private void processCall(CSVar recv, CSObj recvObj) {
-        // TODO - finish me
         recv.getVar().getInvokes().forEach(invoke -> {
             JMethod m = resolveCallee(recvObj, invoke);
             CSCallSite csCallSite = csManager.getCSCallSite(recv.getContext(), invoke);
@@ -348,14 +362,8 @@ public class Solver {
             }
 
             // handle taint source
-            Obj taintObj = taintAnalysis.processSources(invoke);
-            Var taintVar = invoke.getLValue();
-            if (taintObj != null && taintVar != null) {
-                workList.addEntry(
-                        csManager.getCSVar(csCallSite.getContext(), taintVar),
-                        PointsToSetFactory.make(csManager.getCSObj(contextSelector.getEmptyContext(), taintObj))
-                );
-            }
+            taintAnalysis.processSources(invoke, csCallSite.getContext());
+            taintAnalysis.transferTaint(m, recv, csCallSite);
         });
     }
 
